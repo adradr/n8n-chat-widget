@@ -1,0 +1,44 @@
+{
+  "name": "n8n-chat-widget",
+  "version": "1.0.0",
+  "description": "Customizable chat widget for n8n webhooks with streaming support",
+  "main": "dist/chat-widget.min.js",
+  "scripts": {
+    "build": "npm run build:js && npm run build:css",
+    "build:js": "terser src/chat-widget-config.js src/chat-widget-streaming.js -o dist/chat-widget.min.js -c -m",
+    "build:css": "cleancss -o dist/chat-widget.min.css src/chat-widget.css",
+    "build:bundle": "node build.js",
+    "watch": "npm run build && chokidar 'src/**/*' -c 'npm run build'",
+    "prebuild": "mkdir -p dist",
+    "release": "npm version patch && git push && git push --tags",
+    "release:minor": "npm version minor && git push && git push --tags",
+    "release:major": "npm version major && git push && git push --tags"
+  },
+  "keywords": [
+    "n8n",
+    "chat",
+    "widget",
+    "webhook",
+    "streaming",
+    "customer-support",
+    "chatbot",
+    "real-time"
+  ],
+  "author": "adradr",
+  "license": "MIT",
+  "devDependencies": {
+    "terser": "^5.24.0",
+    "clean-css-cli": "^5.6.2",
+    "chokidar-cli": "^3.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adradr/n8n-chat-widget.git"
+  },
+  "files": [
+    "dist/",
+    "src/",
+    "README.md",
+    "LICENSE"
+  ]
+}

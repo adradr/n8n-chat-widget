@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [16.x, 18.x, 20.x]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build widget
+        run: |
+          npm run build
+          npm run build:bundle
+      
+      - name: Check build outputs
+        run: |
+          echo "Checking build outputs..."
+          ls -la dist/
+          
+          # Check file sizes
+          echo "File sizes:"
+          du -h dist/*
+          
+          # Verify files exist
+          test -f dist/chat-widget.min.js || exit 1
+          test -f dist/chat-widget.min.css || exit 1
+          test -f dist/chat-widget.bundle.js || exit 1
+          test -f dist/chat-widget.js || exit 1
+          test -f dist/chat-widget.css || exit 1
+          
+          echo "✅ All build outputs verified!"
+      
+      - name: Archive build artifacts
+        if: matrix.node-version == '18.x'
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist-files
+          path: dist/

@@ -1,0 +1,116 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.1)'
+        required: true
+        type: string
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build widget
+        run: |
+          npm run build
+          npm run build:bundle
+      
+      - name: Create dist archive
+        run: |
+          zip -r dist.zip dist/
+          tar -czf dist.tar.gz dist/
+      
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_version.outputs.VERSION }}
+          release_name: Release ${{ steps.get_version.outputs.VERSION }}
+          body: |
+            ## 📦 n8n Chat Widget ${{ steps.get_version.outputs.VERSION }}
+            
+            ### Installation
+            
+            #### CDN (Recommended)
+            ```html
+            <!-- CSS -->
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/adradr/n8n-chat-widget@${{ steps.get_version.outputs.VERSION }}/dist/chat-widget.min.css">
+            
+            <!-- JavaScript -->
+            <script src="https://cdn.jsdelivr.net/gh/adradr/n8n-chat-widget@${{ steps.get_version.outputs.VERSION }}/dist/chat-widget.min.js"></script>
+            ```
+            
+            #### Bundle (All-in-one)
+            ```html
+            <script src="https://cdn.jsdelivr.net/gh/adradr/n8n-chat-widget@${{ steps.get_version.outputs.VERSION }}/dist/chat-widget.bundle.js"></script>
+            ```
+            
+            ### Downloads
+            Download the archives below to self-host the widget.
+            
+          draft: false
+          prerelease: false
+      
+      - name: Upload Release Assets - ZIP
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist.zip
+          asset_name: n8n-chat-widget-${{ steps.get_version.outputs.VERSION }}.zip
+          asset_content_type: application/zip
+      
+      - name: Upload Release Assets - TAR
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist.tar.gz
+          asset_name: n8n-chat-widget-${{ steps.get_version.outputs.VERSION }}.tar.gz
+          asset_content_type: application/gzip
+      
+      - name: Upload Individual Files
+        run: |
+          # Upload individual dist files as release assets
+          for file in dist/*; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              echo "Uploading $filename"
+              curl -X POST \
+                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Content-Type: $(file -b --mime-type $file)" \
+                --data-binary @"$file" \
+                "${{ steps.create_release.outputs.upload_url }}?name=$filename&label=$filename"
+            fi
+          done
