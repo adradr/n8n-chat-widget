@@ -33,11 +33,6 @@ jobs:
           npm run build
           npm run build:bundle
       
-      - name: Create dist archive
-        run: |
-          zip -r dist.zip dist/
-          tar -czf dist.tar.gz dist/
-      
       - name: Get version
         id: get_version
         run: |
@@ -47,11 +42,38 @@ jobs:
             echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
       
+      - name: Commit dist files
+        run: |
+          # Configure git
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          
+          # Remove dist from .gitignore temporarily
+          sed -i '/^dist\//d' .gitignore
+          
+          # Add and commit dist files
+          git add .gitignore
+          git add dist/
+          git commit -m "Release ${{ steps.get_version.outputs.VERSION }}"
+          
+          # Push to main branch
+          git push origin HEAD:main
+          
+          # Move the tag to the new commit with dist files
+          git tag -f ${{ steps.get_version.outputs.VERSION }}
+          git push origin ${{ steps.get_version.outputs.VERSION }} --force
+      
+      - name: Create dist archive
+        run: |
+          zip -r dist.zip dist/
+          tar -czf dist.tar.gz dist/
+      
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.get_version.outputs.VERSION }}
+          target_commitish: main
           name: Release ${{ steps.get_version.outputs.VERSION }}
           body: |
             ## 📦 n8n Chat Widget ${{ steps.get_version.outputs.VERSION }}
