@@ -49,12 +49,10 @@ jobs:
       
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.get_version.outputs.VERSION }}
-          release_name: Release ${{ steps.get_version.outputs.VERSION }}
+          name: Release ${{ steps.get_version.outputs.VERSION }}
           body: |
             ## 📦 n8n Chat Widget ${{ steps.get_version.outputs.VERSION }}
             
@@ -79,38 +77,8 @@ jobs:
             
           draft: false
           prerelease: false
+          files: |
+            dist.zip
+            dist.tar.gz
+            dist/*
       
-      - name: Upload Release Assets - ZIP
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist.zip
-          asset_name: n8n-chat-widget-${{ steps.get_version.outputs.VERSION }}.zip
-          asset_content_type: application/zip
-      
-      - name: Upload Release Assets - TAR
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist.tar.gz
-          asset_name: n8n-chat-widget-${{ steps.get_version.outputs.VERSION }}.tar.gz
-          asset_content_type: application/gzip
-      
-      - name: Upload Individual Files
-        run: |
-          # Upload individual dist files as release assets
-          for file in dist/*; do
-            if [ -f "$file" ]; then
-              filename=$(basename "$file")
-              echo "Uploading $filename"
-              curl -X POST \
-                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                -H "Content-Type: $(file -b --mime-type $file)" \
-                --data-binary @"$file" \
-                "${{ steps.create_release.outputs.upload_url }}?name=$filename&label=$filename"
-            fi
-          done
