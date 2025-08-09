@@ -30,14 +30,95 @@
         }
     };
 
-    // Session management
-    let currentSessionId = localStorage.getItem('chatbot-session-id');
+    // Session management with sandbox fallback
+    let currentSessionId = null;
+    let storageAvailable = false;
+    
+    // In-memory storage fallback for sandboxed environments
+    const memoryStorage = {
+        _data: {},
+        setItem: function(key, value) { 
+            this._data[key] = String(value); 
+        },
+        getItem: function(key) { 
+            return this._data.hasOwnProperty(key) ? this._data[key] : null;
+        },
+        removeItem: function(key) { 
+            delete this._data[key]; 
+        },
+        clear: function() { 
+            this._data = {}; 
+        }
+    };
+    
+    // Test if localStorage is available
+    try {
+        const testKey = '__localStorage_test__';
+        localStorage.setItem(testKey, 'test');
+        localStorage.removeItem(testKey);
+        storageAvailable = true;
+        debugLog('localStorage is available');
+    } catch (e) {
+        debugLog('localStorage is not available (sandboxed iframe). Using in-memory storage.');
+        storageAvailable = false;
+    }
+    
+    // Safe storage wrapper that falls back to memory storage
+    const safeStorage = {
+        setItem: function(key, value) {
+            try {
+                if (storageAvailable) {
+                    localStorage.setItem(key, value);
+                } else {
+                    memoryStorage.setItem(key, value);
+                }
+            } catch(e) {
+                memoryStorage.setItem(key, value);
+            }
+        },
+        getItem: function(key) {
+            try {
+                if (storageAvailable) {
+                    return localStorage.getItem(key);
+                } else {
+                    return memoryStorage.getItem(key);
+                }
+            } catch(e) {
+                return memoryStorage.getItem(key);
+            }
+        },
+        removeItem: function(key) {
+            try {
+                if (storageAvailable) {
+                    localStorage.removeItem(key);
+                } else {
+                    memoryStorage.removeItem(key);
+                }
+            } catch(e) {
+                memoryStorage.removeItem(key);
+            }
+        },
+        clear: function() {
+            try {
+                if (storageAvailable) {
+                    localStorage.clear();
+                } else {
+                    memoryStorage.clear();
+                }
+            } catch(e) {
+                memoryStorage.clear();
+            }
+        }
+    };
+    
+    // Initialize session ID using safe storage
+    currentSessionId = safeStorage.getItem('chatbot-session-id');
     if (!currentSessionId) {
         currentSessionId = generateUUID();
-        localStorage.setItem('chatbot-session-id', currentSessionId);
+        safeStorage.setItem('chatbot-session-id', currentSessionId);
         debugLog('Generated new session ID:', currentSessionId);
     } else {
-        debugLog('Using existing session ID from localStorage:', currentSessionId);
+        debugLog('Using existing session ID from storage:', currentSessionId);
     }
 
     function generateUUID() {
@@ -47,7 +128,7 @@
     // Chat history management
     function saveChatHistory(messages) {
         try {
-            localStorage.setItem('chatbot-history', JSON.stringify(messages));
+            safeStorage.setItem('chatbot-history', JSON.stringify(messages));
         } catch (error) {
             debugWarn('Failed to save chat history:', error);
         }
@@ -55,7 +136,7 @@
 
     function loadChatHistory() {
         try {
-            const history = localStorage.getItem('chatbot-history');
+            const history = safeStorage.getItem('chatbot-history');
             return history ? JSON.parse(history) : [];
         } catch (error) {
             debugWarn('Failed to load chat history:', error);
@@ -83,7 +164,7 @@
     }
 
     function clearChatHistory() {
-        localStorage.removeItem('chatbot-history');
+        safeStorage.removeItem('chatbot-history');
     }
     
     // Clean up any corrupted history entries on load
@@ -1136,7 +1217,7 @@
                 messagesContainer.innerHTML = '';
                 // Generate new session ID for fresh start
                 currentSessionId = generateUUID();
-                localStorage.setItem('chatbot-session-id', currentSessionId);
+                safeStorage.setItem('chatbot-session-id', currentSessionId);
             }
         });
     }
